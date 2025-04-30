@@ -1,14 +1,14 @@
 package com.example;
 
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
+import javafx.geometry.Point3D;
 import javafx.scene.Group;
-import javafx.scene.Parent;
 import javafx.scene.PerspectiveCamera;
 import javafx.scene.Scene;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
+import javafx.scene.transform.Affine;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
@@ -18,8 +18,6 @@ import java.io.IOException;
  * JavaFX App
  */
 public class App extends Application {
-
-    private static Scene scene;
     
     public void render(Stage primaryStage) {
         // Create a 3D box
@@ -29,9 +27,10 @@ public class App extends Application {
         material.setSpecularColor(Color.LIGHTBLUE); // Set the specular color of the material
         box.setMaterial(material);
 
-        // Apply rotations to the box
-        box.getTransforms().add(new Rotate(30, Rotate.X_AXIS));
-        box.getTransforms().add(new Rotate(30, Rotate.Y_AXIS));
+        Affine affine = new Affine();
+        affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.X_AXIS); // Rotate 30 degrees around the X-axis
+        affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.Y_AXIS); // Rotate 30 degrees around the Y-axis
+        box.getTransforms().add(affine); // Add the affine transformation to the box
 
         // Create a group to hold the 3D objects
         Group root = new Group();
@@ -60,15 +59,6 @@ public class App extends Application {
     public void start(Stage stage) throws IOException {
         // Initialize the 3D rendering
         render(stage); // Render the 3D scene
-    }
-
-    static void setRoot(String fxml) throws IOException {
-        scene.setRoot(loadFXML(fxml));
-    }
-
-    private static Parent loadFXML(String fxml) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource(fxml + ".fxml"));
-        return fxmlLoader.load();
     }
 
     public static void main(String[] args) {
