@@ -179,7 +179,19 @@ public class App extends Application {
         };
         setCameraPosition.run(); // Set the initial camera position
 
-        root.setOnMouseDragged(e -> {
+        executorService = Executors.newSingleThreadScheduledExecutor();
+        executorService.scheduleAtFixedRate(() -> {
+            Platform.runLater(() -> {
+                setCameraPosition.run();
+            });
+        }, 0, 16, java.util.concurrent.TimeUnit.MILLISECONDS); // Schedule the task
+
+        // Create a scene with 3D support
+        Scene scene = new Scene(root, 800, 600, true);
+        scene.setFill(Color.GRAY); // Set the background color of the scene
+        scene.setCamera(camera);
+
+        scene.setOnMouseDragged(e -> {
             // Update camera position based on mouse drag
             if (isMousePressed) {
                 cameraPosAzimuth += (lastMousePosX - e.getSceneX()); // Update azimuth based on mouse movement
@@ -194,27 +206,15 @@ public class App extends Application {
             }
         });
 
-        root.setOnMouseReleased(e -> {
+        scene.setOnMouseReleased(e -> {
             // Reset mouse pressed state when released
             isMousePressed = false; // Reset mouse pressed state
         });
 
-        root.setOnScroll(e -> {
+        scene.setOnScroll(e -> {
             // Update camera radius based on scroll
             cameraPosRadius += e.getDeltaY() / 10; // Adjust the camera radius based on scroll
         });
-
-        executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleAtFixedRate(() -> {
-            Platform.runLater(() -> {
-                setCameraPosition.run();
-            });
-        }, 0, 16, java.util.concurrent.TimeUnit.MILLISECONDS); // Schedule the task
-
-        // Create a scene with 3D support
-        Scene scene = new Scene(root, 800, 600, true);
-        scene.setFill(Color.GRAY); // Set the background color of the scene
-        scene.setCamera(camera);
 
         // Set up the stage
         primaryStage.setTitle("JavaFX 3D Example");
