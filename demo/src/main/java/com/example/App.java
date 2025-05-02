@@ -115,7 +115,9 @@ public class App extends Application {
             0, 1, 1, 2, 4, 0, // 面1: 頂点1, 頂点2, 頂点5
             1, 1, 2, 2, 4, 0, // 面2: 頂点2, 頂点3, 頂点5
             2, 1, 3, 2, 4, 0, // 面3: 頂点3, 頂点4, 頂点5
-            3, 1, 0, 2, 4, 0  // 面4: 頂点4, 頂点1, 頂点5
+            3, 1, 0, 2, 4, 0, // 面4: 頂点4, 頂点1, 頂点5
+            0, 1, 3, 2, 1, 0, // 面5: 頂点1, 頂点2, 頂点3
+            3, 1, 2, 2, 1, 0  // 面6: 頂点1, 頂点3, 頂点4
         );
 
         // メッシュビューを作成
@@ -153,9 +155,9 @@ public class App extends Application {
 
         // Directional Light
         PointLight light = new PointLight(Color.WHITE);
-        light.setTranslateX(-300); // Set the light position
-        light.setTranslateY(-300); // Set the light position
-        light.setTranslateZ(-300); // Set the light position
+        light.setTranslateX(-65535); // Set the light position
+        light.setTranslateY(-65535); // Set the light position
+        light.setTranslateZ(-65535); // Set the light position
         root.getChildren().add(light); // Add the light to the group
 
         // Create a perspective camera
@@ -195,6 +197,11 @@ public class App extends Application {
         root.setOnMouseReleased(e -> {
             // Reset mouse pressed state when released
             isMousePressed = false; // Reset mouse pressed state
+        });
+
+        root.setOnScroll(e -> {
+            // Update camera radius based on scroll
+            cameraPosRadius += e.getDeltaY() / 10; // Adjust the camera radius based on scroll
         });
 
         executorService = Executors.newSingleThreadScheduledExecutor();
