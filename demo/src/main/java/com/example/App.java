@@ -1,6 +1,7 @@
 package com.example;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Point3D;
 import javafx.scene.Group;
 import javafx.scene.PerspectiveCamera;
@@ -13,14 +14,80 @@ import javafx.scene.shape.MeshView;
 import javafx.scene.shape.TriangleMesh;
 import javafx.scene.transform.Affine;
 import javafx.scene.transform.Rotate;
+import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.util.concurrent.Executors;
 
 /**
  * JavaFX App
  */
 public class App extends Application {
+
+    /**
+     * 指定された直行ベクトルからアフィン変換を作成
+     *
+     * @param right 右ベクトル (Point3D)
+     * @param up 上ベクトル (Point3D)
+     * @param forward 前方ベクトル (Point3D)
+     * @return アフィン変換 (Affine)
+     */
+    public static Affine createAffineFromOrthogonalVectors(Point3D right, Point3D up, Point3D forward) {
+        // アフィン変換を作成
+        Affine affine = new Affine();
+    
+        // 直行ベクトルを基に回転行列を設定
+        affine.setMxx(right.getX());
+        affine.setMxy(up.getX());
+        affine.setMxz(forward.getX());
+    
+        affine.setMyx(right.getY());
+        affine.setMyy(up.getY());
+        affine.setMyz(forward.getY());
+    
+        affine.setMzx(right.getZ());
+        affine.setMzy(up.getZ());
+        affine.setMzz(forward.getZ());
+    
+        return affine;
+    }
+
+    /**
+     * 指定された方向を向くアフィン変換を作成
+     *
+     * @param direction 向きベクトル (Point3D)
+     * @return アフィン変換 (Affine)
+     */
+    public static Affine createAffineToFaceDirection(Point3D direction) {
+
+        Point3D right = direction.crossProduct(Rotate.Y_AXIS).normalize();
+        Point3D up = right.crossProduct(direction).normalize();
+        Point3D forward = direction.normalize();
+
+        return createAffineFromOrthogonalVectors(right, up, forward);
+    }
+
+    /**
+     * 方位角、仰角、距離を指定して3D座標を計算
+     *
+     * @param azimuth 方位角 (度単位, 0°は+X軸方向、時計回り)
+     * @param elevation 仰角 (度単位, 0°はXY平面、+90°は+Z軸方向)
+     * @param radius 距離
+     * @return 計算された3D座標 (Point3D)
+     */
+    public static Point3D calculatePoint(double azimuth, double elevation, double radius) {
+        // 度をラジアンに変換
+        double azimuthRad = Math.toRadians(azimuth);
+        double elevationRad = Math.toRadians(elevation);
+
+        // 球面座標からデカルト座標を計算
+        double x = radius * Math.cos(elevationRad) * Math.cos(azimuthRad);
+        double z = radius * Math.cos(elevationRad) * Math.sin(azimuthRad);
+        double y = radius * Math.sin(elevationRad);
+
+        return new Point3D(x, y, z);
+    }
 
     public static MeshView createCustomMesh() {
         // カスタムメッシュを作成
@@ -62,6 +129,15 @@ public class App extends Application {
 
         return meshView;
     }
+
+    private double cameraPosAzimuth = 270.0; // カメラの方位角
+    private double cameraPosElevation = 0.0; // カメラの仰角
+    private double cameraPosRadius = 300.0; // カメラの距離
+    private Point3D cameraPos; // カメラの位置
+    private Point3D pointOfInterest; // カメラの位置
+
+    private double lastMousePosX = 0.0; // マウスのX座標
+    private double lastMousePosY = 0.0; // マウスのY座標
     
     public void render(Stage primaryStage) {
         // Create a 3D box
@@ -71,6 +147,7 @@ public class App extends Application {
         affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.X_AXIS); // Rotate 30 degrees around the X-axis
         affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.Y_AXIS); // Rotate 30 degrees around the Y-axis
         pyramid.getTransforms().add(affine); // Add the affine transformation to the box
+        pyramid.setTranslateY(25);
 
         // Create a group to hold the 3D objects
         Group root = new Group();
@@ -85,11 +162,40 @@ public class App extends Application {
 
         // Create a perspective camera
         PerspectiveCamera camera = new PerspectiveCamera(true);
-        camera.setTranslateZ(-500); // Position the camera
-
-        // Set the near and far clipping planes
+        camera.setTranslateZ(-300); // Position the camera
         camera.setNearClip(0.1); // Set the near clipping plane
         camera.setFarClip(1000.0); // Set the far clipping plane
+        pointOfInterest = new Point3D(0, 0, 0); // Set the point of interest for the camera
+
+        Runnable setCameraPosition = () -> {
+            // Calculate the camera position based on azimuth, elevation, and radius
+            cameraPos = calculatePoint(cameraPosAzimuth, cameraPosElevation, cameraPosRadius);
+            camera.setTranslateX(cameraPos.getX()); // Set new camera position
+            camera.setTranslateY(cameraPos.getY()); // Set new camera position
+            camera.setTranslateZ(cameraPos.getZ()); // Set new camera position
+            camera.getTransforms().clear(); // Clear previous transforms
+            Affine affineToCamera = createAffineToFaceDirection(cameraPos); 
+            affineToCamera.append(new Scale(1.0, 1.0, -1.0)); // Scale the camera
+            camera.getTransforms().add(affineToCamera); // Add new transform to the camera
+        };
+        setCameraPosition.run(); // Set the initial camera position
+
+        root.setOnMouseClicked(e -> {
+            lastMousePosX = e.getSceneX(); // Store the last mouse X position
+            lastMousePosY = e.getSceneY(); // Store the last mouse Y position
+        });
+
+        root.setOnMouseDragged(e -> {
+            // Update camera position based on mouse drag
+            cameraPosAzimuth += 0.016 * (lastMousePosX - e.getSceneX()); // Update azimuth based on mouse movement
+            cameraPosElevation -= 0.016 * (lastMousePosY - e.getSceneY()); // Update elevation based on mouse movement
+        });
+
+        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+            Platform.runLater(() -> {
+                setCameraPosition.run();
+            });
+        }, 0, 16, java.util.concurrent.TimeUnit.MILLISECONDS); // Schedule the task
 
         // Create a scene with 3D support
         Scene scene = new Scene(root, 800, 600, true);
