@@ -62,9 +62,9 @@ public class App extends Application {
      */
     public static Affine createAffineToFaceDirection(Point3D direction) {
 
-        Point3D right = direction.crossProduct(Rotate.Y_AXIS).normalize();
-        Point3D up = right.crossProduct(direction).normalize();
         Point3D forward = direction.normalize();
+        Point3D right = forward.crossProduct(Rotate.Y_AXIS).normalize();
+        Point3D up = right.crossProduct(forward).normalize();
 
         return createAffineFromOrthogonalVectors(right, up, forward);
     }
@@ -137,6 +137,7 @@ public class App extends Application {
     private double cameraPosElevation = 0.0; // カメラの仰角
     private double cameraPosRadius = 300.0; // カメラの距離
     private Point3D cameraPos; // カメラの位置
+    private Point3D cameraPointOfInterest; // カメラの注視点
 
     private double lastMousePosX = 0.0; // マウスのX座標
     private double lastMousePosY = 0.0; // マウスのY座標
@@ -165,24 +166,27 @@ public class App extends Application {
         camera.setTranslateZ(-300); // Position the camera
         camera.setNearClip(0.1); // Set the near clipping plane
         camera.setFarClip(1000.0); // Set the far clipping plane
+        camera.setFieldOfView(45); // Set the field of view
+        cameraPointOfInterest = new Point3D(0, 0, 0); // Set the camera point of interest
 
-        Runnable setCameraPosition = () -> {
+        Runnable updateCameraPositionAndOrientation = () -> {
             // Calculate the camera position based on azimuth, elevation, and radius
             cameraPos = calculatePoint(cameraPosAzimuth, cameraPosElevation, cameraPosRadius);
             camera.setTranslateX(cameraPos.getX()); // Set new camera position
             camera.setTranslateY(cameraPos.getY()); // Set new camera position
             camera.setTranslateZ(cameraPos.getZ()); // Set new camera position
             camera.getTransforms().clear(); // Clear previous transforms
-            Affine affineToCamera = createAffineToFaceDirection(cameraPos); 
-            affineToCamera.append(new Scale(1.0, 1.0, -1.0)); // Scale the camera
+            Point3D direction = cameraPointOfInterest.subtract(cameraPos).normalize().multiply(-1);
+            Affine affineToCamera = createAffineToFaceDirection(direction); 
+            affineToCamera.append(new Scale(1, 1, -1)); // Apply scaling
             camera.getTransforms().add(affineToCamera); // Add new transform to the camera
         };
-        setCameraPosition.run(); // Set the initial camera position
+        updateCameraPositionAndOrientation.run(); // Set the initial camera position
 
         executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(() -> {
             Platform.runLater(() -> {
-                setCameraPosition.run();
+                updateCameraPositionAndOrientation.run();
             });
         }, 0, 16, java.util.concurrent.TimeUnit.MILLISECONDS); // Schedule the task
 
