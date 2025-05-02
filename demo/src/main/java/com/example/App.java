@@ -19,6 +19,7 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * JavaFX App
@@ -134,19 +135,16 @@ public class App extends Application {
     private double cameraPosElevation = 0.0; // カメラの仰角
     private double cameraPosRadius = 300.0; // カメラの距離
     private Point3D cameraPos; // カメラの位置
-    private Point3D pointOfInterest; // カメラの位置
 
     private double lastMousePosX = 0.0; // マウスのX座標
     private double lastMousePosY = 0.0; // マウスのY座標
+
+    private ScheduledExecutorService executorService; // スケジュール実行サービス
+    private boolean isMousePressed = false; // マウスが押されているかどうか
     
     public void render(Stage primaryStage) {
         // Create a 3D box
         MeshView pyramid = createCustomMesh(); // Define dimensions of the box
-
-        Affine affine = new Affine();
-        affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.X_AXIS); // Rotate 30 degrees around the X-axis
-        affine.appendRotation(30, new Point3D(0.0, 0.0, 0.0), Rotate.Y_AXIS); // Rotate 30 degrees around the Y-axis
-        pyramid.getTransforms().add(affine); // Add the affine transformation to the box
         pyramid.setTranslateY(25);
 
         // Create a group to hold the 3D objects
@@ -155,9 +153,9 @@ public class App extends Application {
 
         // Directional Light
         PointLight light = new PointLight(Color.WHITE);
-        light.setTranslateX(-100); // Set the light position
-        light.setTranslateY(-100); // Set the light position
-        light.setTranslateZ(-100); // Set the light position
+        light.setTranslateX(-300); // Set the light position
+        light.setTranslateY(-300); // Set the light position
+        light.setTranslateZ(-300); // Set the light position
         root.getChildren().add(light); // Add the light to the group
 
         // Create a perspective camera
@@ -165,7 +163,6 @@ public class App extends Application {
         camera.setTranslateZ(-300); // Position the camera
         camera.setNearClip(0.1); // Set the near clipping plane
         camera.setFarClip(1000.0); // Set the far clipping plane
-        pointOfInterest = new Point3D(0, 0, 0); // Set the point of interest for the camera
 
         Runnable setCameraPosition = () -> {
             // Calculate the camera position based on azimuth, elevation, and radius
@@ -180,18 +177,28 @@ public class App extends Application {
         };
         setCameraPosition.run(); // Set the initial camera position
 
-        root.setOnMouseClicked(e -> {
-            lastMousePosX = e.getSceneX(); // Store the last mouse X position
-            lastMousePosY = e.getSceneY(); // Store the last mouse Y position
-        });
-
         root.setOnMouseDragged(e -> {
             // Update camera position based on mouse drag
-            cameraPosAzimuth += 0.016 * (lastMousePosX - e.getSceneX()); // Update azimuth based on mouse movement
-            cameraPosElevation -= 0.016 * (lastMousePosY - e.getSceneY()); // Update elevation based on mouse movement
+            if (isMousePressed) {
+                cameraPosAzimuth += (lastMousePosX - e.getSceneX()); // Update azimuth based on mouse movement
+                cameraPosElevation += (lastMousePosY - e.getSceneY()); // Update elevation based on mouse movement
+                lastMousePosX = e.getSceneX(); // Store the last mouse X position
+                lastMousePosY = e.getSceneY(); // Store the last mouse Y position
+            }
+            else {
+                lastMousePosX = e.getSceneX(); // Store the last mouse X position
+                lastMousePosY = e.getSceneY(); // Store the last mouse Y position
+                isMousePressed = true; // Set mouse pressed state
+            }
         });
 
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+        root.setOnMouseReleased(e -> {
+            // Reset mouse pressed state when released
+            isMousePressed = false; // Reset mouse pressed state
+        });
+
+        executorService = Executors.newSingleThreadScheduledExecutor();
+        executorService.scheduleAtFixedRate(() -> {
             Platform.runLater(() -> {
                 setCameraPosition.run();
             });
@@ -212,6 +219,13 @@ public class App extends Application {
     public void start(Stage stage) throws IOException {
         // Initialize the 3D rendering
         render(stage); // Render the 3D scene
+    }
+
+    @Override
+    public void stop() throws Exception {
+        // Cleanup resources if needed
+        super.stop(); // Call the superclass method
+        executorService.shutdown(); // Shutdown the executor service
     }
 
     public static void main(String[] args) {
